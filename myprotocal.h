@@ -33,6 +33,7 @@ typedef struct {
 	// struct header_struct SwpHeader; /* pre-initialized header */
 
 	struct sendQ_slot {
+		uint8_t SeqNo;
 		char msg[MAXDATASIZE];
 	} sendQ[SWS];
 
@@ -41,6 +42,7 @@ typedef struct {
 	expected */
 
 	struct recvQ_slot {
+		uint8_t SeqNo;
 		char msg[MAXDATASIZE];
 	} recvQ[RWS];
 

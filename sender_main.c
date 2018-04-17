@@ -50,7 +50,11 @@ void send_multiple_packet (int socket, struct sockaddr_in * send_address, SwpSta
 
 void send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slot * msg, int length)
 {
-    if(sendto(socket, msg->msg, length, 0, (struct sockaddr*) send_address, sizeof(struct sockaddr)) < 0)
+	printf("sent:%c\n", msg->msg[0]);
+	char buf[sizeof(struct sendQ_slot)];
+	memcpy(buf, msg, sizeof(struct sendQ_slot));
+    if(sendto(socket, buf, sizeof(struct sendQ_slot), 0, (struct sockaddr*) send_address, 
+    	sizeof(struct sockaddr)) < 0)
       perror("sendto()");
 }
 
@@ -67,23 +71,26 @@ void fill_sending_window(SwpState * state, uint8_t LAR, uint8_t LFS, char* filen
 	int i;
 	for(i = LFS + 1; i < LAR + SWS + 1 ; i++)
 	{
-		state->sendQ[i].msg[0] = Send_Sequence_Number;
-		handle_input_file(filename, MAXDATASIZE, &state->sendQ[i].msg[1], global_file_offset);
+		state->sendQ[i].SeqNo = Send_Sequence_Number;
+		if (handle_input_file(filename, MAXDATASIZE, state->sendQ[i].msg, global_file_offset))
+			exit(1);
+		printf("message:%s\n", state->sendQ[i].msg);
 		Send_Sequence_Number++;
 		global_file_offset += MAXDATASIZE;
 	}
 }
 
-static int deliverSWP(SwpState * state, char * recvBuf, 
+static int deliverSWP(SwpState * state, struct recvQ_slot * recvBuf, 
 	int socket, struct sockaddr_in * send_address, char * filename)
 {
 	uint8_t ACK_Sequence_Number;
-	ACK_Sequence_Number = recvBuf[0];
+	ACK_Sequence_Number = recvBuf->SeqNo;
+	printf("LAR:%d, LFS:%d\n", state->LAR,state->LFS);
 	if(swpInWindows(ACK_Sequence_Number, state -> LAR + 1, state-> LFS))
 	{
-		if(state -> LAR == ACK_Sequence_Number)
-			return 0;
-
+		// if(state -> LAR == ACK_Sequence_Number)
+		// 	return 0;
+		printf("reach here.\n");
 		do
 		{
 			struct sendQ_slot * slot;
@@ -91,11 +98,13 @@ static int deliverSWP(SwpState * state, char * recvBuf,
 			//msgDestroy(&slot->msg);
 			//semSignal(&state->sendWindowNotFull);
 		} while (state->LAR != ACK_Sequence_Number);
-
+		printf("LAR:%d\n", state->LAR);
 		fill_sending_window(state, state-> LAR, state-> LFS, filename);
-		send_multiple_packet(socket, send_address, state, state->LAR + 1, state -> LFS);
+		send_multiple_packet(socket, send_address, state, state->LAR + 1, state -> LFS + SWS);
+		state -> LFS = state -> LFS + SWS;
 		return 1;
 	}
+	return 1;
 }
 
 
@@ -129,7 +138,7 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 	fd_set rfds;
 	struct timeval tv;
 
-	char recvBuf;
+	struct recvQ_slot recvBuf;
 
 	unsigned long long int numBytes;
 
@@ -152,17 +161,18 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 	SwpState curr_state;
 	curr_state.LAR = 0;
 	curr_state.LFS = 0;
-	// curr_state.SwpHeader.Send_Sequence_Number=0;
-	// curr_state.SwpHeader.ACK_Sequence_Number=0;
-	// curr_state.SwpHeader.flags=0;
 
-	curr_state.sendQ[0].msg[0] = 0;
-	handle_input_file(filename, 1, &curr_state.sendQ[0].msg[1], global_file_offset);
+
+	curr_state.sendQ[0].SeqNo = 0;
+	handle_input_file(filename, 1, curr_state.sendQ[0].msg, global_file_offset);
+	global_file_offset+=MAXDATASIZE;
 	Send_Sequence_Number ++;
 	// send_packet(senderSocket, &transfer_addr, &buffer, 1);
-	send_multiple_packet(senderSocket, &transfer_addr, &curr_state, curr_state.LAR + 1, curr_state.LFS);
+	fill_sending_window(&curr_state,curr_state.LAR, curr_state.LFS, filename);
+	send_multiple_packet(senderSocket, &transfer_addr, &curr_state, 0, SWS);
+	curr_state.LFS = curr_state.LFS + 1;
 	while(1){
-		 if((numBytes = recvfrom(senderSocket,&recvBuf,sizeof(uint8_t),0,
+		 if((numBytes = recvfrom(senderSocket,&recvBuf,sizeof(struct recvQ_slot),0,
 		 		(struct sockaddr *) &transfer_addr,&transfer_addr_len))==-1){
 		 	if (errno != EAGAIN || errno != EWOULDBLOCK){
 		 		perror("can not receive ack");

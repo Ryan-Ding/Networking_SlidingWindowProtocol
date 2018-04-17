@@ -37,13 +37,16 @@ void send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slo
       perror("sendto()");
 }
 
-void receiveSwp( char * buf, int length, SwpState * state)
+void receiveSwp( char * buf, int length, SwpState * state,int socket, struct sockaddr_in * send_address)
 {
 	char * writeBuf;
+	struct recvQ_slot recv_pkt;
+	memcpy(&recv_pkt, buf, sizeof(struct recvQ_slot));
+	int seq_num = recv_pkt.SeqNo;
 	// When the frame received is the next freame is expected for this swp
-	if(buf[0] == state -> NFE)
+	if(seq_num == state -> NFE)
 	{
-		print_to_file(MAXDATASIZE, &buf[1]);
+		print_to_file(MAXDATASIZE, recv_pkt.msg);
 
 		state -> NFE ++;
 		while(receive_window[state->NFE % RWS])
@@ -55,19 +58,22 @@ void receiveSwp( char * buf, int length, SwpState * state)
 	}
 
 	// When the frame is within windows side, buffer it
-	else if(buf[0] > state -> NFE && buf[0]<= state -> NFE + RWS)
+	else if(seq_num > state -> NFE && seq_num <= state -> NFE + RWS)
 	{
-		if(!receive_window[buf[0]])
+		if(!receive_window[seq_num])
 		{
-			receive_window[buf[0]] = 1;
-			memcpy(state-> recvQ[buf[0] % RWS].msg, &buf[1], MAXDATASIZE);
+			receive_window[seq_num] = 1;
+			memcpy(state-> recvQ[seq_num % RWS].msg, recv_pkt.msg, MAXDATASIZE);
 		}
 	}
 
 	// now send ack
-	char sendBuf;
-	sendBuf = state -> NFE;
-
+	struct recvQ_slot ack_pkt;
+	char sendBuf[sizeof(struct recvQ_slot)];
+	ack_pkt.SeqNo = state -> NFE-1;
+	memcpy(sendBuf, &ack_pkt, sizeof(struct recvQ_slot));
+	if(sendto(socket, sendBuf, sizeof(struct recvQ_slot), 0, (struct sockaddr*) send_address,sizeof(struct sockaddr))<0)
+		perror("send ACK error.");
 
 }
 
@@ -75,7 +81,7 @@ void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
 	char fromAddr[100];
 	struct sockaddr_in theirAddr;
 	socklen_t theirAddrLen;
-	unsigned char recvBuf[1000];
+	unsigned char recvBuf[sizeof(struct recvQ_slot)];
 	int i;
 
 	SwpState curr_state;
@@ -111,16 +117,17 @@ void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
 
 	while(1)
 	{
-		if ((bytesRecvd = recvfrom(receiverSocket, recvBuf, 1, 0,
+		if ((bytesRecvd = recvfrom(receiverSocket, recvBuf, sizeof(struct recvQ_slot), 0,
 					(struct sockaddr*)&theirAddr, &theirAddrLen)) == -1)
 		{
 			perror("connectivity listener: recvfrom failed");
 			exit(1);
 		}
-		printf("recv:%s\n", recvBuf);
-		receiveSwp(recvBuf, bytesRecvd, &curr_state);
-
-		print_to_file(1, (char*)recvBuf);
+		struct recvQ_slot recv_msg;
+		
+		receiveSwp((char*)recvBuf, bytesRecvd, &curr_state, receiverSocket, &theirAddr);
+		memcpy(&recv_msg, recvBuf, sizeof(struct recvQ_slot));
+		printf("recv:%s\n", recv_msg.msg);
 	}
 	//(should never reach here)
 	close(receiverSocket);
