@@ -11,6 +11,7 @@
 #include "myprotocal.h"
 
 FILE * fd_log;
+int receive_window[RWS];
 
 int handle_output_file(char* file)
 {
@@ -28,6 +29,46 @@ int print_to_file(unsigned long long int length, char* buf)
   fputc(buf[0],fd_log);
   fflush(fd_log);
   return 0;
+}
+
+void send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slot * msg, int length)
+{
+    if(sendto(socket, msg->msg, length, 0, (struct sockaddr*) send_address, sizeof(struct sockaddr)) < 0)
+      perror("sendto()");
+}
+
+void receiveSwp( char * buf, int length, SwpState * state)
+{
+	char * writeBuf;
+	// When the frame received is the next freame is expected for this swp
+	if(buf[0] == state -> NFE)
+	{
+		print_to_file(MAXDATASIZE, &buf[1]);
+
+		state -> NFE ++;
+		while(receive_window[state->NFE % RWS])
+		{
+			receive_window[state->NFE % RWS] = 0;
+			print_to_file(MAXDATASIZE, state->recvQ[state->NFE % RWS].msg);
+			state -> NFE ++;
+		}
+	}
+
+	// When the frame is within windows side, buffer it
+	else if(buf[0] > state -> NFE && buf[0]<= state -> NFE + RWS)
+	{
+		if(!receive_window[buf[0]])
+		{
+			receive_window[buf[0]] = 1;
+			memcpy(state-> recvQ[buf[0] % RWS].msg, &buf[1], MAXDATASIZE);
+		}
+	}
+
+	// now send ack
+	char sendBuf;
+	sendBuf = state -> NFE;
+
+
 }
 
 void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
@@ -67,14 +108,20 @@ void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
 
 	int bytesRecvd;
 	theirAddrLen = sizeof(theirAddr);
-	if ((bytesRecvd = recvfrom(receiverSocket, recvBuf, 1, 0,
-				(struct sockaddr*)&theirAddr, &theirAddrLen)) == -1)
+
+	while(1)
 	{
-		perror("connectivity listener: recvfrom failed");
-		exit(1);
+		if ((bytesRecvd = recvfrom(receiverSocket, recvBuf, 1, 0,
+					(struct sockaddr*)&theirAddr, &theirAddrLen)) == -1)
+		{
+			perror("connectivity listener: recvfrom failed");
+			exit(1);
+		}
+		printf("recv:%s\n", recvBuf);
+		receiveSwp(recvBuf, bytesRecvd, &curr_state);
+
+		print_to_file(1, (char*)recvBuf);
 	}
-	printf("recv:%s\n", recvBuf);
-	print_to_file(1, (char*)recvBuf);
 	//(should never reach here)
 	close(receiverSocket);
 }

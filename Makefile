@@ -1,4 +1,4 @@
-all: clean reliable_sender reliable_receiver
+all: reliable_sender reliable_receiver
 
 reliable_sender:
 	gcc -o reliable_sender sender_main.c
