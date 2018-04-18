@@ -42,7 +42,8 @@ void receiveSwp( char * buf, int length, SwpState * state,int socket, struct soc
 	char * writeBuf;
 	struct recvQ_slot recv_pkt;
 	memcpy(&recv_pkt, buf, sizeof(struct recvQ_slot));
-	int seq_num = recv_pkt.SeqNo;
+	long long seq_num = recv_pkt.SeqNo;
+	printf("seqNO: %d\n", seq_num);
 	// When the frame received is the next freame is expected for this swp
 	if(seq_num == state -> NFE)
 	{
@@ -72,6 +73,7 @@ void receiveSwp( char * buf, int length, SwpState * state,int socket, struct soc
 	char sendBuf[sizeof(struct recvQ_slot)];
 	ack_pkt.SeqNo = state -> NFE-1;
 	memcpy(sendBuf, &ack_pkt, sizeof(struct recvQ_slot));
+	printf("sent ack seqNO:%d\n", ack_pkt.SeqNo);
 	if(sendto(socket, sendBuf, sizeof(struct recvQ_slot), 0, (struct sockaddr*) send_address,sizeof(struct sockaddr))<0)
 		perror("send ACK error.");
 

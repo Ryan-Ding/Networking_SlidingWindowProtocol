@@ -20,29 +20,29 @@
 // typedef struct header_struct
 // {
 // 	/* data */
-// 	uint8_t Send_Sequence_Number;
-// 	uint8_t ACK_Sequence_Number;
+// 	long long Send_Sequence_Number;
+// 	long long ACK_Sequence_Number;
 // } header;
 
 
 typedef struct {
 /* sender side state: */
 
-	uint8_t LAR; /* seqno of last ACK received */
-	uint8_t LFS; /* last frame sent */
+	long long LAR; /* seqno of last ACK received */
+	long long LFS; /* last frame sent */
 	// struct header_struct SwpHeader; /* pre-initialized header */
 
 	struct sendQ_slot {
-		uint8_t SeqNo;
+		long long SeqNo;
 		char msg[MAXDATASIZE];
 	} sendQ[SWS];
 
 	/* receiver side state: */
-	uint8_t NFE; /* seqno of next frame
+	long long NFE; /* seqno of next frame
 	expected */
 
 	struct recvQ_slot {
-		uint8_t SeqNo;
+		long long SeqNo;
 		char msg[MAXDATASIZE];
 	} recvQ[RWS];
 
