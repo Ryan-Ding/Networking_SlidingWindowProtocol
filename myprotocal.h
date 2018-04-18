@@ -12,7 +12,7 @@
 #include <sys/select.h>
 #include <sys/time.h>
 
-#define MAXDATASIZE 1
+#define MAXDATASIZE 5
 #define SWS 1
 #define RWS 10
 #define HLEN 3

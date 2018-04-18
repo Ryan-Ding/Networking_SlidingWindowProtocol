@@ -26,8 +26,11 @@ int handle_output_file(char* file)
 int print_to_file(unsigned long long int length, char* buf)
 {
   int i;
-  fputc(buf[0],fd_log);
+  for(i = 0; i < length; i++)
+  	if(buf[i] != '\0')
+  	  fputc(buf[i],fd_log);
   fflush(fd_log);
+
   return 0;
 }
 
@@ -43,7 +46,7 @@ void receiveSwp( char * buf, int length, SwpState * state,int socket, struct soc
 	struct recvQ_slot recv_pkt;
 	memcpy(&recv_pkt, buf, sizeof(struct recvQ_slot));
 	long long seq_num = recv_pkt.SeqNo;
-	printf("seqNO: %d\n", seq_num);
+	printf("seqNO: %lld\n", seq_num);
 	// When the frame received is the next freame is expected for this swp
 	if(seq_num == state -> NFE)
 	{
@@ -73,7 +76,7 @@ void receiveSwp( char * buf, int length, SwpState * state,int socket, struct soc
 	char sendBuf[sizeof(struct recvQ_slot)];
 	ack_pkt.SeqNo = state -> NFE-1;
 	memcpy(sendBuf, &ack_pkt, sizeof(struct recvQ_slot));
-	printf("sent ack seqNO:%d\n", ack_pkt.SeqNo);
+	printf("sent ack seqNO:%lld\n", ack_pkt.SeqNo);
 	if(sendto(socket, sendBuf, sizeof(struct recvQ_slot), 0, (struct sockaddr*) send_address,sizeof(struct sockaddr))<0)
 		perror("send ACK error.");
 
