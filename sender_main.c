@@ -59,6 +59,11 @@ void send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slo
     if(sendto(socket, buf, sizeof(struct sendQ_slot), 0, (struct sockaddr*) send_address, 
     	sizeof(struct sockaddr)) < 0)
       perror("sendto()");
+  	if(msg->msg[0] == '\0')
+  	{
+  		close(socket);
+  		exit(1);
+  	}
 }
 
 bool swpInWindows(long long AckNum, long long left, long long right)
@@ -77,8 +82,10 @@ void fill_sending_window(SwpState * state, long long LAR, long long LFS, char* f
 		state->sendQ[i%SWS].SeqNo = Send_Sequence_Number;
 		if(handle_input_file(filename, MAXDATASIZE, state->sendQ[i%SWS].msg, global_file_offset, bytesToTransfer) 
 			&& state->sendQ[i%SWS].msg[0] == '\0')
-			exit(1);
-
+		{
+			printf("EOF.\n");
+			// exit(1);
+		}
 		printf("message:%s\n", state->sendQ[i%SWS].msg);
 		Send_Sequence_Number++;
 		global_file_offset += MAXDATASIZE;
@@ -92,14 +99,10 @@ static int deliverSWP(SwpState * state, struct recvQ_slot * recvBuf,
 	ACK_Sequence_Number = recvBuf->SeqNo;
 	if(swpInWindows(ACK_Sequence_Number, state -> LAR + 1, state-> LFS))
 	{
-		// if(state -> LAR == ACK_Sequence_Number)
-		// 	return 0;
 		do
 		{
 			struct sendQ_slot * slot;
 			slot = &state -> sendQ[++state -> LAR % SWS];
-			//msgDestroy(&slot->msg);
-			//semSignal(&state->sendWindowNotFull);
 		} while (state->LAR != ACK_Sequence_Number);
 		fill_sending_window(state, state-> LAR, state-> LFS, filename, bytesToTransfer);
 		send_multiple_packet(socket, send_address, state, state->LAR + 1, state -> LFS + SWS);

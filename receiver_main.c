@@ -133,6 +133,8 @@ void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
 		receiveSwp((char*)recvBuf, bytesRecvd, &curr_state, receiverSocket, &theirAddr);
 		memcpy(&recv_msg, recvBuf, sizeof(struct recvQ_slot));
 		printf("recv:%s\n", recv_msg.msg);
+		if(recv_msg.msg[0] == '\0')
+			break;
 	}
 	//(should never reach here)
 	close(receiverSocket);
