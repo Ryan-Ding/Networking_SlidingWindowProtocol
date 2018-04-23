@@ -64,9 +64,9 @@ void receiveSwp( char * buf, int length, SwpState * state,int socket, struct soc
 	// When the frame is within windows side, buffer it
 	else if(seq_num > state -> NFE && seq_num <= state -> NFE + RWS)
 	{
-		if(!receive_window[seq_num])
+		if(!receive_window[seq_num % RWS])
 		{
-			receive_window[seq_num] = 1;
+			receive_window[seq_num % RWS] = 1;
 			memcpy(state-> recvQ[seq_num % RWS].msg, recv_pkt.msg, MAXDATASIZE);
 		}
 	}
@@ -102,7 +102,6 @@ void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
 
 	char myAddr[100];
 	struct sockaddr_in bindAddr;
-	sprintf(myAddr, "127.0.0.1");
 	memset(&bindAddr, 0, sizeof(bindAddr));
 	bindAddr.sin_family = AF_INET;
 	bindAddr.sin_port = htons(myUDPport);

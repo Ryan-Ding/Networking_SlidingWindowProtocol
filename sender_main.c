@@ -76,6 +76,7 @@ bool swpInWindows(long long AckNum, long long left, long long right)
 
 void fill_sending_window(SwpState * state, long long LAR, long long LFS, char* filename, unsigned long long int bytesToTransfer)
 {
+	//printf("start %lld, end %lld\n", LFS + 1, LAR + SWS  );
 	int i;
 	for(i = LFS + 1; i < LAR + SWS + 1 ; i++)
 	{
@@ -105,8 +106,8 @@ static int deliverSWP(SwpState * state, struct recvQ_slot * recvBuf,
 			slot = &state -> sendQ[++state -> LAR % SWS];
 		} while (state->LAR != ACK_Sequence_Number);
 		fill_sending_window(state, state-> LAR, state-> LFS, filename, bytesToTransfer);
-		send_multiple_packet(socket, send_address, state, state->LAR + 1, state -> LFS + SWS);
-		state -> LFS = state -> LFS + SWS;
+		send_multiple_packet(socket, send_address, state, state-> LFS + 1, state -> LAR + SWS);
+		state -> LFS = state -> LAR + SWS;
 		printf("LAR:%lld, LFS:%lld\n", state->LAR,state->LFS);
 		return 1;
 	}
@@ -157,6 +158,14 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 		perror("socket()");
 
 		//get receiver IP address
+
+	tv.tv_sec = 0;
+	tv.tv_usec = 40000;
+	if (setsockopt(senderSocket, SOL_SOCKET, SO_RCVTIMEO, &tv,
+				sizeof(tv)) == -1) {
+			perror("setsockopt");
+			exit(1);
+		}
 		
 	memset(&transfer_addr, 0, sizeof(transfer_addr));
 	socklen_t transfer_addr_len = sizeof(transfer_addr);
@@ -175,7 +184,7 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 
 	send_multiple_packet(senderSocket, &transfer_addr, &curr_state, 0, 0);
 	Send_Sequence_Number ++;
-	curr_state.LFS = curr_state.LFS + SWS - 1;
+	curr_state.LFS = 0;
 	while(1){
 		 if((numBytes = recvfrom(senderSocket,recvBuf,sizeof(struct recvQ_slot),0,
 		 		(struct sockaddr *) &transfer_addr,&transfer_addr_len))==-1){
@@ -187,10 +196,17 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 		 	else
 		 	{
 		 		//resend because of time out
+		 		printf("resend packet, seq_num = %lld\n", (curr_state.sendQ[(curr_state.LAR + 1)%SWS].SeqNo));
+
 		 		send_packet(senderSocket, &transfer_addr, &(curr_state.sendQ[(curr_state.LAR + 1)%SWS]), MAXDATASIZE);
 		 	}
 
         }
+
+     //    		 		for (i=0 ;i<10; i++)
+		 		// {
+		 		// 	printf("send window %d is %lld\n", i, curr_state.sendQ[i].SeqNo);
+		 		// }
         struct recvQ_slot recv_pkt;
         memcpy(&recv_pkt, recvBuf, sizeof(struct recvQ_slot));
         printf("ACK:%lld\n", recv_pkt.SeqNo);
