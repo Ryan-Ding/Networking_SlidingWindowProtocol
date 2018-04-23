@@ -199,14 +199,12 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 		 		printf("resend packet, seq_num = %lld\n", (curr_state.sendQ[(curr_state.LAR + 1)%SWS].SeqNo));
 
 		 		send_packet(senderSocket, &transfer_addr, &(curr_state.sendQ[(curr_state.LAR + 1)%SWS]), MAXDATASIZE);
+		 		continue;
 		 	}
 
         }
 
-     //    		 		for (i=0 ;i<10; i++)
-		 		// {
-		 		// 	printf("send window %d is %lld\n", i, curr_state.sendQ[i].SeqNo);
-		 		// }
+        printf("received bytes = %lld\n", numBytes);
         struct recvQ_slot recv_pkt;
         memcpy(&recv_pkt, recvBuf, sizeof(struct recvQ_slot));
         printf("ACK:%lld\n", recv_pkt.SeqNo);
