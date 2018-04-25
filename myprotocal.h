@@ -12,9 +12,9 @@
 #include <sys/select.h>
 #include <sys/time.h>
 
-#define MAXDATASIZE 1000
+#define MAXDATASIZE 10000
 #define SWS 100
-#define RWS 1000
+#define RWS 100
 #define HLEN 3
 
 // typedef struct header_struct
