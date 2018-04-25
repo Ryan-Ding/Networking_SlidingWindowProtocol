@@ -33,6 +33,8 @@ typedef struct {
 	// struct header_struct SwpHeader; /* pre-initialized header */
 
 	struct sendQ_slot {
+		int packetSize;
+		uint8_t packetType; //1 for data and 0 for FIN
 		long long SeqNo;
 		char msg[MAXDATASIZE];
 	} sendQ[SWS];
@@ -42,6 +44,8 @@ typedef struct {
 	expected */
 
 	struct recvQ_slot {
+		int packetSize;
+		uint8_t packetType; //0 for data ack and 1 for FINACK
 		long long SeqNo;
 		char msg[MAXDATASIZE];
 	} recvQ[RWS];
