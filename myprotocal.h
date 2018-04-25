@@ -12,7 +12,7 @@
 #include <sys/select.h>
 #include <sys/time.h>
 
-#define MAXDATASIZE 10000
+#define MAXDATASIZE 4000
 #define SWS 100
 #define RWS 100
 #define HLEN 3
@@ -33,7 +33,7 @@ typedef struct {
 	// struct header_struct SwpHeader; /* pre-initialized header */
 
 	struct sendQ_slot {
-		long long packetSize;
+		int packetSize;
 		uint8_t packetType; //1 for data and 0 for FIN
 		long long SeqNo;
 		char msg[MAXDATASIZE];
@@ -44,7 +44,7 @@ typedef struct {
 	expected */
 
 	struct recvQ_slot {
-		long long packetSize;
+		int packetSize;
 		uint8_t packetType; //0 for data ack and 1 for FINACK
 		long long SeqNo;
 		char msg[MAXDATASIZE];

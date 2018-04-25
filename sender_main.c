@@ -16,16 +16,13 @@ long long int Send_Sequence_Number;
 
 long long int total_packets;
 
-long long int global_win_size;
-long long int global_threshold = SWS/2;
-
 void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* filename, unsigned long long int bytesToTransfer);
 void send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slot * msg, int length);
 
-long long int handle_input_file(char* file, unsigned long long int length, char * buf, int offset, unsigned long long int bytesToTransfer)
+int handle_input_file(char* file, unsigned long long int length, char * buf, int offset, unsigned long long int bytesToTransfer)
 {
   FILE * fd_send;
-  long long int bytesRead, bytesToRead;
+  int bytesRead, bytesToRead;
 
   fd_send = fopen(file, "r");
   fseek(fd_send, offset, SEEK_SET);
@@ -42,7 +39,7 @@ long long int handle_input_file(char* file, unsigned long long int length, char 
 
   bytesRead = fread(buf, sizeof(char), bytesToRead, fd_send);
 
-    printf("offset = %d, bytestoread = %lld, bytesread = %lld\n", offset, bytesToRead, bytesRead );
+    printf("offset = %d, bytestoread = %d, bytesread = %d\n", offset, bytesToRead, bytesRead );
 
    global_file_offset += bytesRead;
 
@@ -50,25 +47,19 @@ long long int handle_input_file(char* file, unsigned long long int length, char 
   return bytesRead;
 }
 
-int send_multiple_packet (int socket, struct sockaddr_in * send_address, SwpState * state,
+void send_multiple_packet (int socket, struct sockaddr_in * send_address, SwpState * state,
 	int start_frame, int last_frame)
 {
-	int send_size;
-	send_size = last_frame - start_frame;
-	if(send_size > global_win_size)
-		send_size = global_win_size;
-
 	int i;
-	for(i = start_frame; i <= start_frame + send_size; i++)
+	for(i = start_frame; i <= last_frame; i++)
 	{
 		send_packet(socket, send_address, &(state -> sendQ[i%SWS]), MAXDATASIZE);
 	}
-	return send_size;
 }
 
 void send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slot * msg, int length)
 {
-	//printf("sent size: %d, SeqNO: %lld\n", msg->packetSize, msg->SeqNo);
+	printf("sent size: %d, SeqNO: %lld\n", msg->packetSize, msg->SeqNo);
 	char buf[sizeof(struct sendQ_slot)];
 	memcpy(buf, msg, sizeof(struct sendQ_slot));
     if(sendto(socket, buf, sizeof(struct sendQ_slot), 0, (struct sockaddr*) send_address, 
@@ -82,26 +73,6 @@ void send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slo
   	// }
 }
 
-void decreaseWinSize()
-{
-	global_win_size /= 2;
-	global_win_size = global_win_size > 1 ? global_win_size : 1;
-}
-
-void increaseWinSize()
-{
-	if(global_win_size > global_threshold)
-	{
-		global_win_size ++;
-		global_win_size = global_win_size > SWS ? global_win_size : SWS;
-	}
-	else
-	{
-		global_win_size *= 2;
-		global_win_size = global_win_size > global_threshold ? global_threshold : global_win_size;
-	}
-}
-
 bool swpInWindows(long long AckNum, long long left, long long right)
 {
 	if( AckNum >= left && AckNum <= right)
@@ -113,7 +84,7 @@ bool swpInWindows(long long AckNum, long long left, long long right)
 int fill_sending_window(SwpState * state, long long LAR, long long LFS, char* filename, unsigned long long int bytesToTransfer)
 {
 	//printf("start %lld, end %lld\n", LFS + 1, LAR + SWS  );
-	long long int readLength;
+	int readLength;
 	int i;
 	for(i = LFS + 1; i < LAR + SWS + 1 ; i++)
 	{
@@ -124,8 +95,8 @@ int fill_sending_window(SwpState * state, long long LAR, long long LFS, char* fi
 			printf("EOF.\n");
 			//return 1;
 		}
-		printf("read length = %lld\n", readLength );
-		state->sendQ[i%global_threshold].packetSize = readLength;
+		printf("read length = %d\n", readLength );
+		state->sendQ[i%SWS].packetSize = readLength;
 		//printf("message:%s\n", state->sendQ[i%SWS].msg);
 		Send_Sequence_Number++;
 		
@@ -147,8 +118,8 @@ static int deliverSWP(SwpState * state, struct recvQ_slot * recvBuf,
 		} while (state->LAR != ACK_Sequence_Number);
 
 		fill_sending_window(state, state-> LAR, state-> LFS, filename, bytesToTransfer);
-		state -> LFS += send_multiple_packet(socket, send_address, state, state-> LFS + 1, state -> LAR + SWS);
-		// state -> LFS = state -> LAR + SWS;
+		send_multiple_packet(socket, send_address, state, state-> LFS + 1, state -> LAR + SWS);
+		state -> LFS = state -> LAR + SWS;
 		printf("LAR:%lld, LFS:%lld\n", state->LAR,state->LFS);
 		return 1;
 	}
@@ -191,8 +162,6 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 
 	global_file_offset = 0;
 	Send_Sequence_Number = 0;
-
-	global_win_size = 1;
 
 	//get total number of packets
 	total_packets = bytesToTransfer/MAXDATASIZE + (bytesToTransfer % MAXDATASIZE != 0);
@@ -246,9 +215,9 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 		 	else
 		 	{
 		 		//resend because of time out
-		 		printf("resend packet, seq_num = %lld, LAR = %lld, total_packets = %lld\n",
+		 		printf("resend packet, seq_num = %lld, LAR = %lld\n, total_packets = %lld",
 		 		 (curr_state.sendQ[(curr_state.LAR + 1)%SWS].SeqNo), curr_state.LAR, total_packets);
-		 		decreaseWinSize();
+
 		 		send_packet(senderSocket, &transfer_addr, &(curr_state.sendQ[(curr_state.LAR + 1)%SWS]), MAXDATASIZE);
 		 		continue;
 		 	}
@@ -260,8 +229,6 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
         struct recvQ_slot recv_pkt;
         memcpy(&recv_pkt, recvBuf, sizeof(struct recvQ_slot));
         printf("ACK:%lld\n", recv_pkt.SeqNo);
-        increaseWinSize();
-        printf("window size:%lld\n", global_win_size);
         deliverSWP(&curr_state, &recv_pkt, senderSocket, &transfer_addr, filename, bytesToTransfer);
 
         //  for (i = 0; i < SWS; ++i)
@@ -282,6 +249,7 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 		 		(struct sockaddr *) &transfer_addr,&transfer_addr_len))==-1)
       	{
       		perror("can't get FIN error:");
+      		exit(1);
       	}
 
       	struct recvQ_slot fin_recv_pkt;
