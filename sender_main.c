@@ -19,10 +19,10 @@ long long int total_packets;
 void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* filename, unsigned long long int bytesToTransfer);
 void send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slot * msg, int length);
 
-int handle_input_file(char* file, unsigned long long int length, char * buf, int offset, unsigned long long int bytesToTransfer)
+long long int handle_input_file(char* file, unsigned long long int length, char * buf, int offset, unsigned long long int bytesToTransfer)
 {
   FILE * fd_send;
-  int bytesRead, bytesToRead;
+  long long int bytesRead, bytesToRead;
 
   fd_send = fopen(file, "r");
   fseek(fd_send, offset, SEEK_SET);
@@ -39,7 +39,7 @@ int handle_input_file(char* file, unsigned long long int length, char * buf, int
 
   bytesRead = fread(buf, sizeof(char), bytesToRead, fd_send);
 
-    printf("offset = %d, bytestoread = %d, bytesread = %d\n", offset, bytesToRead, bytesRead );
+    printf("offset = %d, bytestoread = %lld, bytesread = %lld\n", offset, bytesToRead, bytesRead );
 
    global_file_offset += bytesRead;
 
@@ -59,7 +59,7 @@ void send_multiple_packet (int socket, struct sockaddr_in * send_address, SwpSta
 
 void send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slot * msg, int length)
 {
-	printf("sent size: %d, SeqNO: %lld\n", msg->packetSize, msg->SeqNo);
+	//printf("sent size: %d, SeqNO: %lld\n", msg->packetSize, msg->SeqNo);
 	char buf[sizeof(struct sendQ_slot)];
 	memcpy(buf, msg, sizeof(struct sendQ_slot));
     if(sendto(socket, buf, sizeof(struct sendQ_slot), 0, (struct sockaddr*) send_address, 
@@ -84,7 +84,7 @@ bool swpInWindows(long long AckNum, long long left, long long right)
 int fill_sending_window(SwpState * state, long long LAR, long long LFS, char* filename, unsigned long long int bytesToTransfer)
 {
 	//printf("start %lld, end %lld\n", LFS + 1, LAR + SWS  );
-	int readLength;
+	long long int readLength;
 	int i;
 	for(i = LFS + 1; i < LAR + SWS + 1 ; i++)
 	{
@@ -95,7 +95,7 @@ int fill_sending_window(SwpState * state, long long LAR, long long LFS, char* fi
 			printf("EOF.\n");
 			//return 1;
 		}
-		printf("read length = %d\n", readLength );
+		printf("read length = %lld\n", readLength );
 		state->sendQ[i%SWS].packetSize = readLength;
 		//printf("message:%s\n", state->sendQ[i%SWS].msg);
 		Send_Sequence_Number++;
@@ -215,7 +215,7 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 		 	else
 		 	{
 		 		//resend because of time out
-		 		printf("resend packet, seq_num = %lld, LAR = %lld\n, total_packets = %lld",
+		 		printf("resend packet, seq_num = %lld, LAR = %lld, total_packets = %lld\n",
 		 		 (curr_state.sendQ[(curr_state.LAR + 1)%SWS].SeqNo), curr_state.LAR, total_packets);
 
 		 		send_packet(senderSocket, &transfer_addr, &(curr_state.sendQ[(curr_state.LAR + 1)%SWS]), MAXDATASIZE);

@@ -35,19 +35,13 @@ int print_to_file(unsigned long long int length, char* buf)
   return 0;
 }
 
-void send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slot * msg, int length)
-{
-    if(sendto(socket, msg->msg, length, 0, (struct sockaddr*) send_address, sizeof(struct sockaddr)) < 0)
-      perror("sendto()");
-}
-
-void receiveSwp( char * buf, int length, SwpState * state,int socket, struct sockaddr_in * send_address)
+void receiveSwp( char * buf, long long int length, SwpState * state,int socket, struct sockaddr_in * send_address)
 {
 	char * writeBuf;
 	struct recvQ_slot recv_pkt;
 	memcpy(&recv_pkt, buf, sizeof(struct recvQ_slot));
 	long long seq_num = recv_pkt.SeqNo;
-	int packetSize = recv_pkt.packetSize;
+	long long packetSize = recv_pkt.packetSize;
 	printf("seqNO: %lld\n", seq_num);
 	// When the frame received is the next freame is expected for this swp
 	if(seq_num == state -> NFE)
@@ -87,7 +81,6 @@ void receiveSwp( char * buf, int length, SwpState * state,int socket, struct soc
 }
 
 void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
-	char fromAddr[100];
 	struct sockaddr_in theirAddr;
 	socklen_t theirAddrLen;
 	unsigned char recvBuf[sizeof(struct recvQ_slot)];
@@ -95,7 +88,6 @@ void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
 
 	SwpState curr_state;
 	curr_state.NFE=0;
-
 
 	int receiverSocket = socket(AF_INET, SOCK_DGRAM, 0);
 	if(receiverSocket < 0)
@@ -120,7 +112,7 @@ void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
 	if(handle_output_file(destinationFile)<0)
 		return;
 
-	int bytesRecvd;
+	long long int bytesRecvd;
 	theirAddrLen = sizeof(theirAddr);
 
 	while(1)
@@ -165,6 +157,5 @@ int main(int argc, char** argv)
 	}
 	
 	udpPort = (unsigned short int)atoi(argv[1]);
-	
 	reliablyReceive(udpPort, argv[2]);
 }

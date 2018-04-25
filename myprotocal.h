@@ -13,8 +13,8 @@
 #include <sys/time.h>
 
 #define MAXDATASIZE 1000
-#define SWS 10
-#define RWS 10
+#define SWS 100
+#define RWS 1000
 #define HLEN 3
 
 // typedef struct header_struct
@@ -33,7 +33,7 @@ typedef struct {
 	// struct header_struct SwpHeader; /* pre-initialized header */
 
 	struct sendQ_slot {
-		int packetSize;
+		long long packetSize;
 		uint8_t packetType; //1 for data and 0 for FIN
 		long long SeqNo;
 		char msg[MAXDATASIZE];
@@ -44,7 +44,7 @@ typedef struct {
 	expected */
 
 	struct recvQ_slot {
-		int packetSize;
+		long long packetSize;
 		uint8_t packetType; //0 for data ack and 1 for FINACK
 		long long SeqNo;
 		char msg[MAXDATASIZE];
