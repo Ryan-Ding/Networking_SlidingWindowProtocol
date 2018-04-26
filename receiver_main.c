@@ -82,7 +82,10 @@ void receiveSwp( char * buf, int length, SwpState * state,int socket, struct soc
 	memcpy(sendBuf, &ack_pkt, sizeof(struct recvQ_slot));
 	printf("sent ack seqNO:%lld\n", ack_pkt.SeqNo);
 	if(sendto(socket, sendBuf, sizeof(struct recvQ_slot), 0, (struct sockaddr*) send_address,sizeof(struct sockaddr))<0)
+	{
 		perror("send ACK error.");
+		exit(1);
+	}
 
 }
 
@@ -96,13 +99,15 @@ void reliablyReceive(unsigned short int myUDPport, char* destinationFile) {
 	SwpState curr_state;
 	curr_state.NFE=0;
 
+	struct timeval tv;
+
 
 	int receiverSocket = socket(AF_INET, SOCK_DGRAM, 0);
 	if(receiverSocket < 0)
 	{
 		perror("socket()");
 		exit(1);
-	}
+	}	
 
 	char myAddr[100];
 	struct sockaddr_in bindAddr;

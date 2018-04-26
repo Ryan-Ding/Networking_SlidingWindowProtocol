@@ -17,7 +17,7 @@ long long int Send_Sequence_Number;
 long long int total_packets;
 
 void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* filename, unsigned long long int bytesToTransfer);
-void send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slot * msg, int length);
+int send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slot * msg, int length);
 
 int handle_input_file(char* file, unsigned long long int length, char * buf, int offset, unsigned long long int bytesToTransfer)
 {
@@ -57,20 +57,13 @@ void send_multiple_packet (int socket, struct sockaddr_in * send_address, SwpSta
 	}
 }
 
-void send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slot * msg, int length)
+int send_packet(int socket, struct sockaddr_in * send_address, struct sendQ_slot * msg, int length)
 {
 	printf("sent size: %d, SeqNO: %lld\n", msg->packetSize, msg->SeqNo);
 	char buf[sizeof(struct sendQ_slot)];
 	memcpy(buf, msg, sizeof(struct sendQ_slot));
-    if(sendto(socket, buf, sizeof(struct sendQ_slot), 0, (struct sockaddr*) send_address, 
-    	sizeof(struct sockaddr)) < 0)
-      perror("sendto()");
-  	// if(msg->msg[0] == '\0')
-  	// {
-  	// 	printf("READ EOF AND EXIT NOW\n");
-  	// 	close(socket);
-  	// 	exit(1);
-  	// }
+    return (sendto(socket, buf, sizeof(struct sendQ_slot), 0, (struct sockaddr*) send_address, 
+    	sizeof(struct sockaddr)));
 }
 
 bool swpInWindows(long long AckNum, long long left, long long right)
@@ -158,6 +151,11 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 
 	unsigned long long int numBytes;
 
+	struct timeval global_timer_start;
+	struct timeval global_timer_now;
+	struct timeval global_timer_fin_start;
+	gettimeofday(&global_timer_start, 0);
+
 	char recvBuf[sizeof(struct recvQ_slot)];
 
 	global_file_offset = 0;
@@ -239,17 +237,26 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 	}
 
 	//now start sending FIN signals
+	gettimeofday(&global_timer_fin_start, 0);
 	while(1)
 	{
 		struct sendQ_slot FINpacket;
 		FINpacket.packetType = 1;
-		send_packet(senderSocket, &transfer_addr, &FINpacket, MAXDATASIZE);
+		if (send_packet(senderSocket, &transfer_addr, &FINpacket, MAXDATASIZE) < 0)
+		{
+			perror("error sending FIN:");
+			exit(1);
+		}
 
       	if((numBytes = recvfrom(senderSocket,recvBuf,sizeof(struct recvQ_slot),0,
 		 		(struct sockaddr *) &transfer_addr,&transfer_addr_len))==-1)
       	{
       		perror("can't get FIN error:");
-      		exit(1);
+      		gettimeofday(&global_timer_now, 0);
+        	printf("Completion time = %d\n",(int) (global_timer_now.tv_sec - global_timer_start.tv_sec));
+        	if(global_timer_now.tv_sec - global_timer_fin_start.tv_sec >1)
+        		exit(1);
+      		//exit(1);
       	}
 
       	struct recvQ_slot fin_recv_pkt;
@@ -257,7 +264,8 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 
         if(fin_recv_pkt.packetType == 1)
         {
-        	printf("FIN ACK received\n");
+        	gettimeofday(&global_timer_now, 0);
+        	printf("Completion time = %d\n",(int) (global_timer_now.tv_sec - global_timer_start.tv_sec));
         	exit(1);
         }
 
