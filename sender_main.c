@@ -173,7 +173,7 @@ void reliablyTransfer(char* hostname, unsigned short int hostUDPport, char* file
 		//get receiver IP address
 
 	tv.tv_sec = 0;
-	tv.tv_usec = 40000;
+	tv.tv_usec = 10000;
 	if (setsockopt(senderSocket, SOL_SOCKET, SO_RCVTIMEO, &tv,
 				sizeof(tv)) == -1) {
 			perror("setsockopt");
